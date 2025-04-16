@@ -1,0 +1,6 @@
+setup.py
+slam.egg-info/PKG-INFO
+slam.egg-info/SOURCES.txt
+slam.egg-info/dependency_links.txt
+slam.egg-info/requires.txt
+slam.egg-info/top_level.txt

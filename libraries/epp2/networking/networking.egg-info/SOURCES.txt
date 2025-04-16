@@ -1,0 +1,6 @@
+setup.py
+networking.egg-info/PKG-INFO
+networking.egg-info/SOURCES.txt
+networking.egg-info/dependency_links.txt
+networking.egg-info/requires.txt
+networking.egg-info/top_level.txt

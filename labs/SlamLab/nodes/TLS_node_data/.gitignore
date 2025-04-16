@@ -1,0 +1,4 @@
+# Gitignore to ignore everything in the nodedata folder
+*
+# except for the .gitignore file itself
+!.gitignore
