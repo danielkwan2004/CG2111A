@@ -611,32 +611,15 @@ const char* computeMajorityColor()
   }
 }
 
+uint32_t pulseInLowPA6() {
+   while (PINA & (1 << 6));
+   while (!(PINA & (1 << 6)));
+   uint32_t count = 0;
+   while (!(PINA & (1 << 6))) count++;
+   return count;
+}
+
 void loop() {
-  // Uncomment the code below for Step 2 of Activity 3 in Week 8 Studio 2
-  //  clawOpen();
-  //  delay(2000);
-  //   clawClose();
-  //  delay(2000);
-  //forward(0, 100);
-  //  dbprintf("PI is %3.2f\n", PI);
-  // put your main code here, to run repeatedly:
-  // right(0,100);
-  // delay(1000);
-  // stop();
-  // backward(0,100);
-  // stop();
-  // delay(5000);
-  // ccw(0,100);
-  // stop();
-  // delay(5000);
-  // cw(0,100);
-  // stop();
-  // delay(5000);
-    // 1) If there's text in the Serial buffer, read it as a line
-  // deploymedpack();
-  // delay(2000);
-  // resetmedpack();
-  // delay(2000);
   TPacket recvPacket;  // This holds commands from the PI
   TResult result = readPacket(&recvPacket);
 
@@ -690,21 +673,16 @@ void loop() {
   unsigned long now = millis();
   if (now - lastColorCheck >= colorCheckInterval) {
     lastColorCheck = now; // reset the timer
-
     // 2) Read RED
-    digitalWrite(S2, HIGH);
-    digitalWrite(S3, HIGH);
-    redFrequency = pulseIn(sensorOut, LOW);
-
+    PORTA |=  (1<<3)|(1<<4);   // S2=HIGH, S3=HIGH
+    redFrequency   = pulseInLowPA6();
     // 3) Read GREEN
-    digitalWrite(S2, LOW);
-    digitalWrite(S3, LOW);
-    greenFrequency = pulseIn(sensorOut, LOW);
-
-    // 4) Read BLUE (optional)
-    digitalWrite(S2, LOW);
-    digitalWrite(S3, HIGH);
-    blueFrequency = pulseIn(sensorOut, LOW);
+    PORTA &= ~((1<<3)|(1<<4)); // S2=LOW,  S3=LOW
+    greenFrequency = pulseInLowPA6();
+    // 4) Read BLUE
+    PORTA &=  ~(1<<3);         // S2=LOW
+    PORTA |=   (1<<4);         // S3=HIGH
+    blueFrequency  = pulseInLowPA6();
 
     // 5) Compute sum & ratios
     unsigned long sum = redFrequency + greenFrequency + blueFrequency;
@@ -712,22 +690,14 @@ void loop() {
     float rRatio = (float) redFrequency   / sum;
     float gRatio = (float) greenFrequency / sum;
     float bRatio = (float) blueFrequency / sum;
-    // (We won't specifically use bRatio for "red vs. green," 
-    // but reading it helps with total brightness.)
-
     // 6) Determine newColor
     char newColor[MAX_STR_LEN];
     strncpy(newColor, "no color detected right now", MAX_STR_LEN);
-
     // If total brightness is high enough, compare red vs. green
     if (sum >= brightnessThreshold) {
       // Must exceed the other ratio by ratioThreshold
-      if (rRatio > gRatio + 0.06 && rRatio > bRatio + 0.06) {
-        strncpy(newColor, "RED", MAX_STR_LEN);
-      } 
-      else if (gRatio > rRatio + 0.06 && gRatio > bRatio + 0.06) {
-        strncpy(newColor, "GREEN", MAX_STR_LEN);
-      }
+      if (rRatio > gRatio + 0.06 && rRatio > bRatio + 0.06) strncpy(newColor, "RED", MAX_STR_LEN);
+      else if (gRatio > rRatio + 0.06 && gRatio > bRatio + 0.06) strncpy(newColor, "GREEN", MAX_STR_LEN);
       // else remains "no color detected right now"
     }
 
