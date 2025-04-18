@@ -309,19 +309,9 @@ void setupSerial() {
     UCSR0B = (1<<RXEN0) | (1<<TXEN0);  // enable receiver and transmitter 
     UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);
 }
-
-
-void startSerial() {
-  // Empty for now. To be replaced with bare-metal code
-  // later on.
-}
-
 int readSerial(char *buffer) {
-
   int count = 0;
-
-  // Change Serial to Serial2/Serial3/Serial4 in later labs when using other UARTs
-
+  // Change Serial to Serial2/Serial3/Serial4 in later labs when using other UART
    // As long as data is waiting (RXCn = 1), grab it
     while (UCSR0A & (1<<RXC0)) {      // RXC0: USART Receive Complete 
         buffer[count++] = UDR0;        // read the data 
@@ -340,6 +330,10 @@ void writeSerial(const char *buffer, int len) {
     }
 }
 
+void startSerial() {
+  // Empty for now. To be replaced with bare-metal code
+  // later on.
+}
 
 // Clears all our counters
 void clearCounters() {
@@ -442,7 +436,7 @@ void waitForHello() {
 }
 
 // Configure Timer0 for 1 kHz CTC interrupts
-void setupMillis(void) {
+void setupMillis() {
     // Clear control registers
     TCCR0A = 0;
     TCCR0B = 0;
@@ -456,12 +450,10 @@ void setupMillis(void) {
     TIMSK0 |= (1 << OCIE0A);              
     // Reset counter
     TCNT0 = 0;
-    // Enable global interrupts
-    sei();
 }
 
 // Return the number of milliseconds since startup
-uint32_t getMillis(void) {
+uint32_t getMillis() {
     uint32_t m;
     uint8_t oldSREG = SREG;
     cli();
@@ -482,6 +474,7 @@ void setup() {
   startSerial();
   enablePullups();
   initializeState();
+  setupMillis();
   sei();
   DDRH |= (1<<6);
   DDRB |= (1<<4);
