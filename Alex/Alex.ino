@@ -3,18 +3,20 @@
 //#include <ArduinoRobotMotorBoard.h>
 //#include <LineFollow.h>
 //#include <EasyTransfer2.h>
-#define S0 27
-#define S1 26
-#define S2 25
-#define S3 24
-#define sensorOut 28
 #include <math.h>
 #include <stdarg.h>
 #include <serialize.h>
+#include <stdint.h>
+#include <cstdint>
 
 #include "packet.h"
 #include "constants.h"
 #include <Servo.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <stdint.h>
+
+volatile uint32_t msTicks;
 
 //for color sensor
 int redFrequency = 0;
@@ -84,17 +86,6 @@ unsigned long newDist;
 unsigned long deltaTicks;
 unsigned long targetTicks;
 
-//take from the front 
-#define clawLeftAbovepin 9
-#define clawRightAbovepin 10
-#define clawLeftBelowpin 44  
-#define clawRightBelowpin 45
-#define CLAWMEDPACKPIN 46
-Servo clawLeftAbove;
-Servo clawRightAbove;
-Servo clawLeftBelow;
-Servo clawRightBelow;
-Servo medpackclaw;
 
 /*
 
@@ -340,8 +331,13 @@ ISR(INT3_vect) {
 // with bare-metal code.
 void setupSerial() {
   // To replace later with bare-metal.
-  Serial.begin(9600);
-  // Change Serial to Serial2/Serial3/Serial4 in later labs when using the other UARTs
+  // Baud = F_CPU/16/(UBRR+1) → UBRR = 16 MHz/16/9600 − 1 ≈ 103
+    UBRR0H = (103 >> 8);               // high byte of baud rate
+    UBRR0L = (uint8_t)103;             // low byte of baud rate 
+
+    UCSR0A = 0;                        // normal speed, clear flags 
+    UCSR0B = (1<<RXEN0) | (1<<TXEN0);  // enable receiver and transmitter 
+    UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);
 }
 
 // Start the serial connection. For now we are using
@@ -363,24 +359,24 @@ int readSerial(char *buffer) {
 
   // Change Serial to Serial2/Serial3/Serial4 in later labs when using other UARTs
 
-  while (Serial.available())
-    buffer[count++] = Serial.read();
-
-  return count;
+   // As long as data is waiting (RXCn = 1), grab it
+    while (UCSR0A & (1<<RXC0)) {      // RXC0: USART Receive Complete 
+        buffer[count++] = UDR0;        // read the data 
+    }
+    return count;
 }
 
 // Write to the serial port. Replaced later with
 // bare-metal code
 
 void writeSerial(const char *buffer, int len) {
-  Serial.write(buffer, len);
-  // Change Serial to Serial2/Serial3/Serial4 in later labs when using other UARTs
+   for (int i = 0; i < len; i++) {
+        // Wait for data register empty (UDRE0 = 1)
+        while (!(UCSR0A & (1<<UDRE0))); // UDRE0: USART Data Register Empty 
+        UDR0 = buffer[i];               // send the byte 
+    }
 }
 
-/*
-   Alex's setup and run codes
-
-*/
 
 // Clears all our counters
 void clearCounters() {
@@ -400,35 +396,6 @@ void clearCounters() {
 
 // Clears one particular counter
 void clearOneCounter(int which) {
-  //  switch(which)
-  //  {
-  //    case 0:
-  //      clearCounters();
-  //      break;
-  //
-  //    case 1:
-  //      leftTicks=0;
-  //      break;
-  //
-  //    case 2:
-  //      rightTicks=0;
-  //      break;
-  //
-  //    case 3:
-  //      leftRevs=0;
-  //      break;
-  //
-  //    case 4:
-  //      rightRevs=0;
-  //      break;
-  //
-  //    case 5:
-  //      forwardDist=0;
-  //      break;
-  //
-  //    case 6:
-  //      reverseDist=0;
-  //      break;
   clearCounters();
 }
 
@@ -511,6 +478,36 @@ void waitForHello() {
   }  // !exit
 }
 
+// Configure Timer0 for 1 kHz CTC interrupts
+void setupMillis(void) {
+    // Clear control registers
+    TCCR0A = 0;
+    TCCR0B = 0;
+    // CTC mode: WGM01=1, WGM00=0
+    TCCR0A |= (1 << WGM01);              
+    // Prescaler = CLK/64 -> CS01=1, CS00=1
+    TCCR0B |= (1 << CS01) | (1 << CS00);  
+    // Set compare value for 1 ms tick: (16 MHz/64)/1000 − 1 = 249
+    OCR0A = 249;                          
+    // Enable Compare Match A interrupt
+    TIMSK0 |= (1 << OCIE0A);              
+    // Reset counter
+    TCNT0 = 0;
+    // Enable global interrupts
+    sei();
+}
+
+// Return the number of milliseconds since startup
+uint32_t getMillis(void) {
+    uint32_t m;
+    uint8_t oldSREG = SREG;
+    cli();
+    m = msTicks;
+    SREG = oldSREG;
+    return m;
+}
+
+
 void setup() {
   // put your setup code here, to run once:
   alexDiagonal = sqrt((ALEX_LENGTH * ALEX_LENGTH) + (ALEX_BREADTH * ALEX_BREADTH));
@@ -523,22 +520,20 @@ void setup() {
   enablePullups();
   initializeState();
   sei();
+  DDRH |= (1<<6);
+  DDRB |= (1<<4);
+  DDRL |= (1<<5);
+  DDRL |= (1<<4);
+  DDRL |= (1<<3);
+  
 
-  clawLeftAbove.attach(9);  // adjust pin numbers as needed
-  clawRightAbove.attach(10);
-  clawLeftBelow.attach(clawLeftBelowpin); //fill pin numbers
-  clawRightBelow.attach(clawRightBelowpin); //fill pin numbers
-  medpackclaw.attach(CLAWMEDPACKPIN);
+  // configure pins
+  DDRA |= (1<<5)|(1<<4)|(1<<3)|(1<<2);  // PA5, PA4, PA3, PA2 as outputs
+  DDRA &= ~(1<<6);                    // PA6 as input
 
-
-  pinMode(S0, OUTPUT);
-  pinMode(S1, OUTPUT);
-  pinMode(S2, OUTPUT);
-  pinMode(S3, OUTPUT);
-  pinMode(sensorOut, INPUT);
-
-  digitalWrite(S0, HIGH);
-  digitalWrite(S1, LOW);  // 20% frequency scaling
+  // set initial outputs 
+  PORTA |=  (1<<5); // S0 high
+  PORTA &= ~(1<<4); // S1 low
 }
 
 
@@ -582,6 +577,14 @@ int colorIndex = 0;  // Points to the next write position
 // This holds the last color we actually sent to the Pi.
 char lastSentColor[MAX_STR_LEN] = "no color detected right now";
 
+uint32_t pulseInLowPA6() {
+   while (PINA & (1 << 6));
+   while (!(PINA & (1 << 6)));
+   uint32_t count = 0;
+   while (!(PINA & (1 << 6))) count++;
+   return count;
+}
+
 // 2) Function to figure out which color appears most often in the ring buffer
 //    (We only do "RED", "GREEN", or "no color detected right now" in this example.)
 const char* computeMajorityColor()
@@ -609,14 +612,6 @@ const char* computeMajorityColor()
   else {
     return "no color detected right now";
   }
-}
-
-uint32_t pulseInLowPA6() {
-   while (PINA & (1 << 6));
-   while (!(PINA & (1 << 6)));
-   uint32_t count = 0;
-   while (!(PINA & (1 << 6))) count++;
-   return count;
 }
 
 void loop() {
@@ -670,7 +665,7 @@ void loop() {
       stop();
     }
   }
-  unsigned long now = millis();
+  uint32_t now = getMillis();
   if (now - lastColorCheck >= colorCheckInterval) {
     lastColorCheck = now; // reset the timer
     // 2) Read RED
