@@ -1,8 +1,4 @@
 
-//#include <Multiplexer.h>
-//#include <ArduinoRobotMotorBoard.h>
-//#include <LineFollow.h>
-//#include <EasyTransfer2.h>
 #include <math.h>
 #include <stdarg.h>
 #include <serialize.h>
@@ -11,10 +7,11 @@
 
 #include "packet.h"
 #include "constants.h"
-#include <Servo.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdint.h>
+#include <string.h>
+#include <stdio.h>
 
 volatile uint32_t msTicks;
 
@@ -30,7 +27,7 @@ volatile TDirection dir;
 */
 
 // PI, for calculating circumference
-//#define PI 3.141592654
+#define PI 3.141592654
 
 // Alex's length and breadth in cm
 #define ALEX_LENGTH 25.6
@@ -158,20 +155,11 @@ void sendStatus() {
   statusPacket.params[8] = forwardDist;
   statusPacket.params[9] = reverseDist;
   sendResponse(&statusPacket);
-
-  // Implement code to send back a packet containing key
-  // information like leftTicks, rightTicks, leftRevs, rightRevs
-  // forwardDist and reverseDist
-  // Use the params array to store this information, and set the
-  // packetType and command files accordingly, then use sendResponse
-  // to send out the packet. See sendMessage on how to use sendResponse.
-  //
 }
 
 void sendMessage(const char *message) {
   // Sends text messages back to the Pi. Useful
   // for debugging.
-
   TPacket messagePacket;
   messagePacket.packetType = PACKET_TYPE_MESSAGE;
   strncpy(messagePacket.data, message, MAX_STR_LEN);
@@ -277,8 +265,6 @@ void leftISR() {
   } else if (dir == LEFT) {
     leftReverseTicksTurns++;
   }
-  //  Serial.print("LEFT: ");
-  //  Serial.println(leftTicks / COUNTS_PER_REV * WHEEL_CIRC);
 }
 
 void rightISR() {
@@ -291,8 +277,6 @@ void rightISR() {
   } else if (dir == LEFT) {
     rightForwardTicksTurns++;
   }
-  //  Serial.print("RIGHT: ");
-  //  Serial.println(rightTicks / COUNTS_PER_REV * WHEEL_CIRC);
 }
 
 // Set up the external interrupt pins INT2 and INT3
@@ -301,10 +285,6 @@ void setupEINT() {
 
   EICRA |= 0b10100000;
   EIMSK |= 0b00001100;
-  // Use bare-metal to configure pins 18 and 19 to be
-  // falling edge triggered. Remember to enable
-  // the INT2 and INT3 interrupts.
-  // Hint: Check pages 110 and 111 in the ATmega2560 Datasheet.
 }
 
 ISR(INT2_vect) {
@@ -315,22 +295,12 @@ ISR(INT3_vect) {
   leftISR();
 }
 
-// Implement the external interrupt ISRs below.
-// INT3 ISR should call leftISR while INT2 ISR
-// should call rightISR.
-
-
-// Implement INT2 and INT3 ISRs above.
-
 /*
    Setup and start codes for serial communications
 
 */
-// Set up the serial connection. For now we are using
-// Arduino Wiring, you will replace this later
-// with bare-metal code.
+
 void setupSerial() {
-  // To replace later with bare-metal.
   // Baud = F_CPU/16/(UBRR+1) → UBRR = 16 MHz/16/9600 − 1 ≈ 103
     UBRR0H = (103 >> 8);               // high byte of baud rate
     UBRR0L = (uint8_t)103;             // low byte of baud rate 
@@ -340,18 +310,11 @@ void setupSerial() {
     UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);
 }
 
-// Start the serial connection. For now we are using
-// Arduino wiring and this function is empty. We will
-// replace this later with bare-metal code.
 
 void startSerial() {
   // Empty for now. To be replaced with bare-metal code
   // later on.
 }
-
-// Read the serial port. Returns the read character in
-// ch if available. Also returns TRUE if ch is valid.
-// This will be replaced later with bare-metal code.
 
 int readSerial(char *buffer) {
 
