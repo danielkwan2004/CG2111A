@@ -100,26 +100,20 @@ void stop() {
 
 
 void clawOpen() {
-    
-       clawLeftAbove.write(0);  // to partially close
-       clawRightAbove.write(180);  // to open
-       clawLeftBelow.write(0);
-      clawRightBelow.write(180);
-
+    PORTH &= ~(1<<6);
+    PORTB |= (1<<4);
+    PORTL &= ~(1<<5);
+    PORTL |= (1<<4);
 }
-
-void deploymedpack() {
-  medpackclaw.write(0);
-}
-
-void resetmedpack() {
-  medpackclaw.write(180);
-}
-
-
 void clawClose() {
-       clawLeftAbove.write(100);  // to partially close
-       clawRightAbove.write(80);  // to open
-       clawLeftBelow.write(100);
-      clawRightBelow.write(80);
+    PORTH |= (1<<6);
+    PORTB &= ~(1<<4);
+    PORTL |= (1<<5);
+    PORTL &= ~(1<<4);
+}
+void deployMedpack() {
+    PORTL &= ~(1<<3);
+}
+void resetMedpack() {
+    PORTL |= (1<<3);
 }
